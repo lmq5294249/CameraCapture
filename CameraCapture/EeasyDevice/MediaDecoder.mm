@@ -39,6 +39,12 @@ struct FrameInfo {
     NSUInteger _currentAudioFramePos;
     NSData *_currentAudioFrameSamples;
     CGFloat _moviePosition;
+    // 互斥锁
+    pthread_mutex_t mutexAudioFrame;
+    void *_videoDecHandle;  // 视频解码句柄
+    CGFloat lastFrameTimeStamp;
+    NSTimeInterval beforeDecoderTimeStamp;
+    NSTimeInterval afterDecoderTimeStamp;
     
     AudioQueuePlay *audioPlayer;
 }
@@ -50,20 +56,6 @@ struct FrameInfo {
 @end
 
 @implementation MediaDecoder
-{
-    // 互斥锁
-    pthread_mutex_t mutexVideoFrame;
-    pthread_mutex_t mutexAudioFrame;
-    pthread_mutex_t mutexChan;
-    pthread_mutex_t mutexRecordFrame;
-    
-    void *_videoDecHandle;  // 视频解码句柄
-    
-    CGFloat lastFrameTimeStamp;
-    NSTimeInterval beforeDecoderTimeStamp;
-    NSTimeInterval afterDecoderTimeStamp;
-}
-
 
 - (instancetype)init
 {
@@ -206,8 +198,8 @@ struct FrameInfo {
 {
     char *temp_data = (char *) malloc(size);
     memcpy(temp_data, buffer, size);
-//    NSData *rawAAC = [NSData dataWithBytes:temp_data length:size];
-//    NSLog(@"音频大小:%d",(int)size);
+    NSData *rawAAC = [NSData dataWithBytes:temp_data length:size];
+    NSLog(@"音频大小:%d",(int)size);
     RtspFrameFlag frameType = RTSP_AFRAME_FLAG;
     frameInfo.length = size;
     [self pushFrame:temp_data frameInfo:&frameInfo type:frameType];
