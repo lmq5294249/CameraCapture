@@ -211,7 +211,7 @@ void continueAfterDESCRIBE(RTSPClient* rtspClient, int resultCode, char* resultS
 
 // By default, we request that the server stream its data using RTP/UDP.
 // If, instead, you want to request that the server stream via RTP-over-TCP, change the following to True:
-#define REQUEST_STREAMING_OVER_TCP false
+#define REQUEST_STREAMING_OVER_TCP true
 
 void setupNextSubsession(RTSPClient* rtspClient) {
     UsageEnvironment& env = rtspClient->envir(); // alias
@@ -535,7 +535,8 @@ void DummySink::afterGettingFrame(unsigned frameSize, unsigned numTruncatedBytes
       这里时间戳对应音视频的前后时间播放顺序
       */
 //        printf("audio type = %s \n",fSubsession.codecName());
-        printf("audio presentationTime = %f \n",fSubsession.getNormalPlayTime(presentationTime));
+        double audioPlayTime = fSubsession.getNormalPlayTime(presentationTime);
+        printf("audio presentationTime = %f \n",audioPlayTime);
         RtspConnection *rtspConnection = [RtspConnection shareStore];
         [rtspConnection.delegate decodeAudioUnit:fReceiveBuffer Size:frameSize];
         
@@ -543,8 +544,9 @@ void DummySink::afterGettingFrame(unsigned frameSize, unsigned numTruncatedBytes
     else if (!strcmp(fSubsession.mediumName(), "video"))
     {
 //        printf("audio type = %s \n",fSubsession.codecName());
+        double videoPlayTime = fSubsession.getNormalPlayTime(presentationTime);
+        printf("Video presentationTime = %f \n",videoPlayTime);
         RtspConnection *rtspConnection = [RtspConnection shareStore];
-        printf("Video presentationTime = %f \n",fSubsession.getNormalPlayTime(presentationTime));
         [rtspConnection.delegate decodeNalu:fReceiveBuffer Size:frameSize];
     }
     
