@@ -288,7 +288,7 @@
 {
     self.cameraDev = [[EeasyDEV alloc] init];
     
-    self.cameraSocket = [[CameraSocketManager alloc] initWithHost:@"192.168.2.1" Port:8886 QueueName:"CameraSocketQueue"];
+    self.cameraSocket = [[CameraSocketManager alloc] initWithHost:@"192.168.1.100" Port:8886 QueueName:"CameraSocketQueue"];
     self.cameraSocket.delegate = self;
 }
 
@@ -457,6 +457,29 @@
     
     [_cameraSocket connectToServer];
     [_cameraSocket sendGetSDCardPhotoListCmd];
+    
+//    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+//        NSArray *fileArray = [NSArray array];
+//        [_cameraSocket connectToServer];
+//        [_cameraSocket sendGetSDCardPhotoThumbListCmd:fileArray];
+//    });
+    
+    
+    //MARK:2022-12测试缩略图刷新逻辑
+//    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+//        //图像
+//        NSMutableArray *mediaArray = [NSMutableArray array];
+//        for (int i = 0; i< 30; i++) {
+//            MediaModel *model = [[MediaModel alloc] init];
+//            model.fileName = [NSString stringWithFormat:@"photo_%d.jpg",i];
+//            model.filePath = [NSString stringWithFormat:@"/aaa/bbb/ccc/photo_%d.jpg",i];
+//            model.fileSize = 2000;
+//            model.mediaType = MediaTypePhoto;
+//            [mediaArray addObject:model];
+//        }
+//        self.mediaTableView.curMediaType = MediaTypePhoto;
+//        [self.mediaTableView setDataArray:mediaArray];
+//    });
 }
 
 - (void)didGetVideoListBtn:(UIButton *)btn
@@ -602,7 +625,7 @@
         //图像
         for (NSDictionary *fileDic in array) {
             MediaModel *model = [[MediaModel alloc] init];
-            model.fileName = [fileDic objectForKey:@"file_name"];
+            model.fileName = [[fileDic objectForKey:@"file_name"] lastPathComponent];
             model.filePath = [fileDic objectForKey:@"file_name"];
             model.fileSize = [[fileDic objectForKey:@"file_size"] intValue];
             model.mediaType = MediaTypePhoto;
@@ -618,7 +641,7 @@
         //视频
         for (NSDictionary *fileDic in array) {
             MediaModel *model = [[MediaModel alloc] init];
-            model.fileName = [fileDic objectForKey:@"file_name"];
+            model.fileName = [[fileDic objectForKey:@"file_name"] lastPathComponent];
             model.filePath = [fileDic objectForKey:@"file_name"];
             model.mediaType = MediaTypeVideo;
             [mediaArray addObject:model];
@@ -628,6 +651,26 @@
             [self.mediaTableView setDataArray:mediaArray];
         });
     }
+    //获取列表后，再获取前5的缩略图
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSMutableArray *fileArray = [NSMutableArray array];
+        for (int i = 0; i < mediaArray.count; i++) {
+            MediaModel *model = mediaArray[i];
+            NSDictionary *dict = @{@"file_name":model.filePath};
+            [fileArray addObject:dict];
+            if (i >= 4) {
+                break;
+            }
+        }
+        NSLog(@"缩略图请求.......");
+        [_cameraSocket connectToServer];
+        if (type == 1) {
+            [_cameraSocket sendGetSDCardVideoThumbListCmd:fileArray];
+        }
+        else{
+            [_cameraSocket sendGetSDCardPhotoThumbListCmd:fileArray];
+        }
+    });
 }
 
 - (void)startVideoPlayback
@@ -681,7 +724,22 @@
         [hud showAnimated:YES];
         [hud hideAnimated:YES afterDelay:3.0];
         [self.view addSubview:hud];
-        _formatBtn.enabled = YES;
+        self.formatBtn.enabled = YES;
+    });
+}
+
+- (void)didGetThumbList:(NSArray *)array
+{
+    //将获取的数组中的缩略图重新建立一个字典索引机制（将文件名作为key值，内容作为键值）
+    NSMutableDictionary *thumbDictionary = [[NSMutableDictionary alloc] init];
+    for (int i = 0; i < array.count; i++) {
+        NSDictionary *dict = array[i];
+        [thumbDictionary setObject:[dict objectForKey:@"image"] forKey:[dict objectForKey:@"thumName"]];
+    }
+    //刷新界面
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self.mediaTableView.thumbDict addEntriesFromDictionary:thumbDictionary];
+        [self.mediaTableView reloadData];
     });
 }
 
@@ -721,7 +779,43 @@
     [_cameraSocket sendStartPlaySDCardVideoCmd:model.filePath];
 }
 
-
+- (void)didRequestMediaThumbWith:(NSMutableArray *)array meidaType:(MediaType)type
+{
+    NSMutableArray *fileArray = [NSMutableArray array];
+    for (int i = 0; i < array.count; i++) {
+        MediaModel *model = array[i];
+        NSDictionary *dict = @{@"file_name":model.filePath};
+        [fileArray addObject:dict];
+    }
+    //这里需要做一个判断如果滚动过长数组数量过多，最多请求倒数最近的10条缩略图就行
+    if (fileArray.count > 4) {
+        NSRange removeRange = NSMakeRange(0, array.count - 4);
+        [fileArray removeObjectsInRange:removeRange];
+    }
+    [array removeAllObjects];
+    NSLog(@"缩略图请求.......");
+    if (fileArray.count <= 0) {
+        return;
+    }
+    [_cameraSocket connectToServer];
+    if (type == MediaTypeVideo) {
+        [_cameraSocket sendGetSDCardVideoThumbListCmd:fileArray];
+    }
+    else{
+        [_cameraSocket sendGetSDCardPhotoThumbListCmd:fileArray];
+    }
+    
+    //MARK:2022-12自动化测试返回缩略图数据
+//    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+//        NSMutableDictionary *dict = [[NSMutableDictionary alloc] init];
+//        for (int i = 0; i < fileArray.count; i++) {
+//            NSString *filename = fileArray[i];
+//            [dict setObject:[UIImage imageNamed:@"thumb.jpg"] forKey:[filename lastPathComponent]];
+//        }
+//        [self.mediaTableView.thumbDict addEntriesFromDictionary:dict];
+//        [self.mediaTableView reloadData];
+//    });
+}
 
 
 #pragma mark - UITextFieldDelegate
