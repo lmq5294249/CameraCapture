@@ -64,12 +64,16 @@ typedef struct Mp4DownloadInfo{
 +(NSData *)buildStopRecordCmdPack;
 //SD 卡图片列表获取请求
 +(NSData *)buildGetSDCardPhotoListCmdPack;
+//SD 卡图片缩略图列表获取请求
++(NSData *)buildGetSDCardPhotoThumbListCmdPack:(NSArray *)fileArray;
 //SD 卡图片下载请求
 +(NSData *)buildDownloadPhotoFromSDCardCmdPack:(NSString *)fileName;
 //SD 卡图片删除请求
 +(NSData *)buildDeletePhotoFromSDCardCmdPack:(NSString *)fileName;
 //SD 卡录像文件列表获取请求
 +(NSData *)buildGetSDCardVideoListCmdPack;
+//SD 卡视频缩略图列表获取请求
++(NSData *)buildGetSDCardVideoThumbListCmdPack:(NSArray *)fileArray;
 //SD 卡录像文件删除请求
 +(NSData *)buildDeleteVideoFromSDCardCmdPack:(NSString *)fileName;
 //SD 卡录像文件下载请求
