@@ -159,6 +159,38 @@
     return packData;
 }
 
+//SD 卡图片缩略图列表获取请求
++(NSData *)buildGetSDCardPhotoThumbListCmdPack:(NSArray *)fileArray
+{
+    NSMutableData *packData = [[NSMutableData alloc] init];
+    NSNumber *fileNum = [NSNumber numberWithUnsignedInteger:fileArray.count];
+//    NSArray *testArray = @[@{@"file_name":@"/media/photo/PHOTO_000000.jpg"},
+//                              @{@"file_name":@"/media/photo/PHOTO_000001.jpg"},
+//                              @{@"file_name":@"/media/photo/PHOTO_000002.jpg"},
+//                              @{@"file_name":@"/media/photo/PHOTO_000003.jpg"},
+//                              @{@"file_name":@"/media/photo/PHOTO_000004.jpg"}
+//    ];
+    NSDictionary *dic = @{@"cmd":@"getSdThumListReq",
+                          @"type":@"picList",
+                          @"reqListLen":fileNum,
+                          @"reqList":fileArray
+    };
+    NSLog(@"打印字典:%@",dic);
+    NSData *cmdData = [NSJSONSerialization dataWithJSONObject:dic options:NSJSONWritingPrettyPrinted error:nil];
+    NSString *jsonString = [[NSString alloc] initWithData:cmdData encoding:NSUTF8StringEncoding];
+    NSString *jsonString2 = [jsonString stringByReplacingOccurrencesOfString:@"\\" withString:@""];
+    NSString *jsonString3 = [jsonString2 stringByReplacingOccurrencesOfString:@" " withString:@""];
+    cmdData = [jsonString3 dataUsingEncoding:NSUTF8StringEncoding];
+    NSLog(@"打印字符转:%@",jsonString3);
+    long length = cmdData.length;
+    //命令头
+    NSData *headData = [self buildHeadPackWithU32Type:0x2010 Id:0x3A6A6A6A dataPackLength:length];
+    [packData appendData:headData];
+    [packData appendData:cmdData];
+    
+    return packData;
+}
+
 //SD 卡图片下载请求
 +(NSData *)buildDownloadPhotoFromSDCardCmdPack:(NSString *)fileName
 {
@@ -168,6 +200,10 @@
                           @"file_name":fileName
     };
     NSData *cmdData = [NSJSONSerialization dataWithJSONObject:dic options:NSJSONWritingPrettyPrinted error:nil];
+    NSString *jsonString = [[NSString alloc] initWithData:cmdData encoding:NSUTF8StringEncoding];
+    NSString *jsonString2 = [jsonString stringByReplacingOccurrencesOfString:@"\\" withString:@""];
+    NSString *jsonString3 = [jsonString2 stringByReplacingOccurrencesOfString:@" " withString:@""];
+    cmdData = [jsonString3 dataUsingEncoding:NSUTF8StringEncoding];
     long length = cmdData.length;
     //命令头
     NSData *headData = [self buildHeadPackWithU32Type:0x2043 Id:0x3A5A5A5A dataPackLength:length];
@@ -186,6 +222,10 @@
                           @"file_name":fileName
     };
     NSData *cmdData = [NSJSONSerialization dataWithJSONObject:dic options:NSJSONWritingPrettyPrinted error:nil];
+    NSString *jsonString = [[NSString alloc] initWithData:cmdData encoding:NSUTF8StringEncoding];
+    NSString *jsonString2 = [jsonString stringByReplacingOccurrencesOfString:@"\\" withString:@""];
+    NSString *jsonString3 = [jsonString2 stringByReplacingOccurrencesOfString:@" " withString:@""];
+    cmdData = [jsonString3 dataUsingEncoding:NSUTF8StringEncoding];
     long length = cmdData.length;
     //命令头
     NSData *headData = [self buildHeadPackWithU32Type:0x2041 Id:0x3A5A5A5A dataPackLength:length];
@@ -211,6 +251,32 @@
     return packData;
 }
 
+//SD 卡视频缩略图列表获取请求
++(NSData *)buildGetSDCardVideoThumbListCmdPack:(NSArray *)fileArray
+{
+    NSMutableData *packData = [[NSMutableData alloc] init];
+    NSNumber *fileNum = [NSNumber numberWithUnsignedInteger:fileArray.count];
+    NSDictionary *dic = @{@"cmd":@"getSdThumListReq",
+                          @"type":@"recList",
+                          @"reqListLen":fileNum,
+                          @"reqList":fileArray
+    };
+//    NSData *cmdData = [NSJSONSerialization dataWithJSONObject:dic options:NSJSONWritingPrettyPrinted error:nil];
+    NSData *cmdData = [NSJSONSerialization dataWithJSONObject:dic options:NSJSONWritingPrettyPrinted error:nil];
+    NSString *jsonString = [[NSString alloc] initWithData:cmdData encoding:NSUTF8StringEncoding];
+    NSString *jsonString2 = [jsonString stringByReplacingOccurrencesOfString:@"\\" withString:@""];
+    NSString *jsonString3 = [jsonString2 stringByReplacingOccurrencesOfString:@" " withString:@""];
+    cmdData = [jsonString3 dataUsingEncoding:NSUTF8StringEncoding];
+    NSLog(@"打印字符转:%@",jsonString3);
+    long length = cmdData.length;
+    //命令头
+    NSData *headData = [self buildHeadPackWithU32Type:0x2010 Id:0x3A6A6A6A dataPackLength:length];
+    [packData appendData:headData];
+    [packData appendData:cmdData];
+    
+    return packData;
+}
+
 //SD 卡录像文件删除请求
 +(NSData *)buildDeleteVideoFromSDCardCmdPack:(NSString *)fileName
 {
@@ -220,6 +286,10 @@
                           @"file_name":fileName
     };
     NSData *cmdData = [NSJSONSerialization dataWithJSONObject:dic options:NSJSONWritingPrettyPrinted error:nil];
+    NSString *jsonString = [[NSString alloc] initWithData:cmdData encoding:NSUTF8StringEncoding];
+    NSString *jsonString2 = [jsonString stringByReplacingOccurrencesOfString:@"\\" withString:@""];
+    NSString *jsonString3 = [jsonString2 stringByReplacingOccurrencesOfString:@" " withString:@""];
+    cmdData = [jsonString3 dataUsingEncoding:NSUTF8StringEncoding];
     long length = cmdData.length;
     //命令头
     NSData *headData = [self buildHeadPackWithU32Type:0x2029 Id:0x3A5A5A5A dataPackLength:length];
@@ -238,6 +308,10 @@
                           @"file_name":fileName
     };
     NSData *cmdData = [NSJSONSerialization dataWithJSONObject:dic options:NSJSONWritingPrettyPrinted error:nil];
+    NSString *jsonString = [[NSString alloc] initWithData:cmdData encoding:NSUTF8StringEncoding];
+    NSString *jsonString2 = [jsonString stringByReplacingOccurrencesOfString:@"\\" withString:@""];
+    NSString *jsonString3 = [jsonString2 stringByReplacingOccurrencesOfString:@" " withString:@""];
+    cmdData = [jsonString3 dataUsingEncoding:NSUTF8StringEncoding];
     long length = cmdData.length;
     //命令头
     NSData *headData = [self buildHeadPackWithU32Type:0x2045 Id:0x3A5A5A5A dataPackLength:length];
@@ -256,6 +330,10 @@
                           @"file_name":fileName
     };
     NSData *cmdData = [NSJSONSerialization dataWithJSONObject:dic options:NSJSONWritingPrettyPrinted error:nil];
+    NSString *jsonString = [[NSString alloc] initWithData:cmdData encoding:NSUTF8StringEncoding];
+    NSString *jsonString2 = [jsonString stringByReplacingOccurrencesOfString:@"\\" withString:@""];
+    NSString *jsonString3 = [jsonString2 stringByReplacingOccurrencesOfString:@" " withString:@""];
+    cmdData = [jsonString3 dataUsingEncoding:NSUTF8StringEncoding];
     long length = cmdData.length;
     //命令头
     NSData *headData = [self buildHeadPackWithU32Type:0x2033 Id:0x3A5A5A5A dataPackLength:length];
@@ -475,6 +553,11 @@
                           @"sec":[NSNumber numberWithInteger:sec]
     };
     return dic;
+}
+
++ (NSString *)base64Encode:(NSString *)str{
+    NSData * data = [str dataUsingEncoding:NSUTF8StringEncoding];
+    return [data base64EncodedStringWithOptions:0];
 }
 
 @end
