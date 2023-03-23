@@ -70,6 +70,7 @@ struct FrameInfo {
 - (void)initVideoDecoder
 {
 //    self.rtspString = @"rtsp://192.168.2.1/live2";
+//    self.rtspString = @"rtsp://192.168.1.100:554/live";
     self.rtspString = @"rtsp://wowzaec2demo.streamlock.net/vod/mp4:BigBuckBunny_115k.mp4";
     [RtspConnection sharedRtspConnection].delegate = self;
     //初始化解码，设置刷图层
@@ -91,9 +92,13 @@ struct FrameInfo {
     //目前只能手动配置录音的相关参数u，后续可通过packet数据包解析参数
     frameInfo.codec = RTSP_AUDIO_CODE_AAC;
     frameInfo.type = 0;
-    frameInfo.sample_rate = 12000;
-    frameInfo.channels = 2;
+    frameInfo.sample_rate = 8000;
+    frameInfo.channels = 1;
     frameInfo.bits_per_sample = 16;
+    
+//    frameInfo.sample_rate = 12000;
+//    frameInfo.channels = 2;
+//    frameInfo.bits_per_sample = 16;
 }
 
 #pragma mark - 播放控制
@@ -125,7 +130,6 @@ struct FrameInfo {
     self.audioThread = [[NSThread alloc] initWithTarget:self selector:@selector(runloopForAudio) object:nil];
     [self.audioThread start];
     
-    __weak typeof(self) weakSelf = self;
 //    [CarEyeAudioPlayer sharedInstance].sampleRate = frameInfo.sample_rate;
 //    [CarEyeAudioPlayer sharedInstance].channel = frameInfo.channels;
 //    [CarEyeAudioPlayer sharedInstance].source = self;
@@ -133,13 +137,6 @@ struct FrameInfo {
 //        [weakSelf pushAudioData:outData numFrames:numFrames numChannels:numChannels];
 //    };
 //    [[CarEyeAudioPlayer sharedInstance] play];
-    audioPlayer = [[AudioQueuePlay alloc] init];
-    [audioPlayer setAudioPlayerSampleRate:frameInfo.sample_rate mChannelsPerFrame:frameInfo.channels];
-    audioPlayer.outputBlock = ^(SInt16 *outData, UInt32 numFrames, UInt32 numChannels) {
-        [weakSelf pushAudioData:outData numFrames:numFrames numChannels:numChannels];
-    };
-    [audioPlayer fillNullData];//需要填充空包后才开始播放
-    [audioPlayer startPlay];
 }
 
 - (void)stopAudio {
@@ -170,25 +167,48 @@ struct FrameInfo {
         NSLog(@"%@ : 音频采样率 = %d",NSStringFromClass([self class]),frameInfo.sample_rate);
         NSLog(@"%@ : 音频通道数 = %d",NSStringFromClass([self class]),frameInfo.channels);
         NSLog(@"%@ : 音频采样位数 = %d",NSStringFromClass([self class]),frameInfo.bits_per_sample);
+        
+        __weak typeof(self) weakSelf = self;
+        audioPlayer = [[AudioQueuePlay alloc] init];
+        [audioPlayer setAudioPlayerSampleRate:frameInfo.sample_rate mChannelsPerFrame:frameInfo.channels];
+        audioPlayer.outputBlock = ^(SInt16 *outData, UInt32 numFrames, UInt32 numChannels) {
+            [weakSelf pushAudioData:outData numFrames:numFrames numChannels:numChannels];
+        };
+        [audioPlayer fillNullData];//需要填充空包后才开始播放
+        [audioPlayer startPlay];
     }
 }
 
 
 -(void)decodeNalu:(uint8_t *)buffer Size:(int)size
 {
-    uint8_t *temp_data;
-    temp_data =(uint8_t *) malloc(size+4);
-    uint8_t startCode[] = {0x00, 0x00, 0x00, 0x01};
-    memcpy(temp_data, startCode, sizeof(startCode));
-    memcpy(temp_data+sizeof(startCode), buffer, size);
-    
-//    if (_mp4Helper) {
-//        [_mp4Helper doRunloop:temp_data Size:size+4];
-//    }
-    [_h264Decoder decodeNalu:temp_data withSize:size+4 withoutStartCode:buffer];
-    
-    free(temp_data);
-    temp_data = nil;
+    int startCodeData = (buffer[0] & 0xFF);
+    if (startCodeData == 0x00) {
+        uint8_t *temp_data;
+//        NSData *data1 = [NSData dataWithBytes:buffer length:size];
+        temp_data =(uint8_t *) malloc(size-4);
+        memcpy(temp_data, buffer + 4, size - 4);
+//        NSData *data2 = [NSData dataWithBytes:temp_data length:size - 4];
+        [_h264Decoder parseAndDecodeH264Nalu:buffer withSize:size withoutStartCode:temp_data];
+        free(temp_data);
+        temp_data = nil;
+    }
+    else{
+        uint8_t *temp_data;
+        temp_data =(uint8_t *) malloc(size+4);
+        uint8_t startCode[] = {0x00, 0x00, 0x00, 0x01};
+        memcpy(temp_data, startCode, sizeof(startCode));
+        memcpy(temp_data+sizeof(startCode), buffer, size);
+        //    if (_mp4Helper) {
+        //        [_mp4Helper doRunloop:temp_data Size:size+4];
+        //    }
+        
+        [_h264Decoder decodeNalu:temp_data withSize:size+4 withoutStartCode:buffer];
+        
+        free(temp_data);
+        temp_data = nil;
+    }
+
     if (_isCameraBroken) {
         _isCameraBroken = NO;
     }
@@ -349,7 +369,12 @@ struct FrameInfo {
                         [_audioFrames removeObjectAtIndex:0];
                         
                         if (differ > 5 && count > 1) {
-                            //NSLog(@"audio skip movPos = %.4f audioPos = %.4f", _moviePosition, frame.position);
+                            
+                            NSLog(@"audio skip movPos = %.4f audioPos = %.4f", _moviePosition, frame.position);
+                            continue;
+                        }
+                        if (count > 5) {
+                            [_audioFrames removeObjectsInRange:NSMakeRange(0, count - 6)];
                             continue;
                         }
                         
