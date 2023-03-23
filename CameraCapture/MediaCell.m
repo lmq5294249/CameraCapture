@@ -20,6 +20,10 @@
     
     if (self = [super initWithStyle:style reuseIdentifier:reuseIdentifier]) {
         
+        self.thumbView = [[UIImageView alloc] init];
+        self.thumbView.contentMode = UIViewContentModeScaleAspectFit;
+        [self.contentView addSubview:self.thumbView];
+        
         self.fileNameLabel = [[UILabel alloc] init];
         self.fileNameLabel.textColor = [UIColor whiteColor];
         self.fileNameLabel.font = [UIFont systemFontOfSize:16.0];
@@ -54,7 +58,9 @@
 {
     [super layoutSubviews];
     
-    self.fileNameLabel.frame = CGRectMake(16, 0, CGRectGetWidth(self.frame) * 0.65, CGRectGetHeight(self.frame));
+    self.thumbView.frame = CGRectMake(16, CGRectGetHeight(self.frame) * 0.1, CGRectGetHeight(self.frame) * 0.8 * 1.78, CGRectGetHeight(self.frame) * 0.8);
+    
+    self.fileNameLabel.frame = CGRectMake(16 + CGRectGetMaxX(self.thumbView.frame), 0, CGRectGetWidth(self.frame) * 0.4, CGRectGetHeight(self.frame));
     
     self.playBtn.frame = CGRectMake(CGRectGetWidth(self.frame) - 44*3 - 16*3, (CGRectGetHeight(self.frame) - 44)/2, 44, 44);
     
