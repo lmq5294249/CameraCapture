@@ -5,7 +5,7 @@
 //  Created by 林漫钦 on 2022/9/26.
 //
 
-#import <Foundation/Foundation.h>
+#import <UIKit/UIKit.h>
 
 typedef NS_ENUM(NSUInteger, MediaType) {
     MediaTypePhoto,
@@ -19,6 +19,7 @@ typedef NS_ENUM(NSUInteger, MediaType) {
 @property (nonatomic, strong) NSString *filePath;
 @property (nonatomic, assign) int fileSize;
 @property (nonatomic, assign) NSInteger index;
+@property (nonatomic, strong) UIImage *thumbImg; //缩略图
 
 @end
 
