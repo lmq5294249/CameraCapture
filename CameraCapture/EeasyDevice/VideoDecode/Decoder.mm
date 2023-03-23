@@ -250,6 +250,141 @@ static int _lastFrameNum = -2;//上一帧帧序号
 }
 
 #pragma mark -解码一帧数据
+- (void)parseAndDecodeH264Nalu:(uint8_t *)frame withSize:(uint32_t)frameSize withoutStartCode:(uint8_t *)buffer
+{
+    //NSData *data = [NSData dataWithBytes:frame length:frameSize];
+    //NSLog(@"打印Data:%@",data);
+    int frame_num_max;
+    //数据解析-H264-数据分割
+    int nalu_type = (frame[4] & 0x1F);
+    CVPixelBufferRef pixelBuffer = NULL;
+    if (nalu_type == 0x07) {
+        //IDR关键帧跟PPS帧跟SPS帧分割
+        //检索出各个类型NAL的起始位置
+        int SPS_index = 0;
+        int PPS_index = 0;
+        int IDR_index = 0;
+        for (int i = 6; i < 100; i++) {
+            int startCode00 = (frame[i] & 0xFF);
+            int startCode01 = (frame[i+1] & 0xFF);
+            int startCode02 = (frame[i+2] & 0xFF);
+            int startCode03 = (frame[i+3] & 0xFF);
+            if (startCode00 == 0x00 && startCode01 == 0x00 && startCode02 == 0x00 && startCode03 == 0x01) {
+                if (PPS_index == 0) {
+                    PPS_index = i;
+                }
+                else{
+                    IDR_index = i;
+                    break;
+                }
+            }
+        }
+        if (PPS_index == 0 || IDR_index == 0 || PPS_index > IDR_index) {
+#ifdef DEBUG
+            NSLog(@"VideoDecoder:解析PPS SPS IDR 失败,帧数据错误。。。。。");  //关键帧
+#endif
+            return;
+        }
+        //减去startCode的大小
+        _spsSize = PPS_index - SPS_index - 4;
+        _ppsSize = IDR_index - PPS_index - 4;
+        NSInteger iDRFrameSize = frameSize - IDR_index; //不需要减去00 00 00 01，因为后面要替换为帧大小size
+        
+        //SPS
+        _sps = (uint8_t *) malloc(_spsSize);
+        memcpy(_sps, &frame[4], _spsSize);
+        //NSData * spsData = [[NSData alloc] initWithBytes:_sps length:_spsSize];
+        //NSLog(@"sps---%@---%ld",spsData,(long)_spsSize);
+        
+        //PPS
+        _pps = (uint8_t *) malloc(_ppsSize);
+        memcpy(_pps, &frame[PPS_index + 4], _ppsSize);
+        //NSData * ppsData = [[NSData alloc] initWithBytes:_pps length:_ppsSize];
+        //NSLog(@"sps---%@---%ld",ppsData,(long)_ppsSize);
+        
+        //IDR帧处理
+        uint32_t nalSize = (uint32_t)(iDRFrameSize - 4);
+        uint8_t *iDRframeData = (uint8_t *) malloc(iDRFrameSize);
+        memcpy(iDRframeData, &frame[IDR_index], iDRFrameSize);
+        //NSData * keframeData = [[NSData alloc] initWithBytes:iDRframeData length:iDRFrameSize];
+        //NSLog(@"keframeData---%@---%ld",keframeData,(long)iDRFrameSize);
+        
+        uint8_t *naluData = (uint8_t *) malloc(nalSize);
+        memcpy(naluData, &frame[IDR_index + 4], nalSize);
+        
+        uint8_t *pNalSize = (uint8_t*)(&nalSize);
+        //转换字节序
+        iDRframeData[0] = *(pNalSize + 3);
+        iDRframeData[1] = *(pNalSize + 2);
+        iDRframeData[2] = *(pNalSize + 1);
+        iDRframeData[3] = *(pNalSize);
+        
+        //丢帧处理
+        read_nal_unit(_h, _sps, _spsSize);
+        read_nal_unit(_h, _pps, _ppsSize);
+        read_nal_unit(_h, naluData, nalSize);
+        //帧序号最大值计算
+        frame_num_max = pow(2, _h->sps->log2_max_frame_num_minus4+4);
+        
+        int nal_unit_Type = (naluData[0] & 0x1F);
+        if (nal_unit_Type == 0x05) {
+#ifdef DEBUG
+            NSLog(@"nalu_type:%d Nal type is IDR frame",nalu_type);  //关键帧
+#endif
+            if([self initH264Decoder])
+            {
+                pixelBuffer = [self decode:iDRframeData BufferSize:iDRFrameSize]; //
+            }
+            else{
+                NSLog(@"VideoDecoder:------初始化initH264Decoder失败------");
+            }
+        }
+        free(iDRframeData);
+        iDRframeData = nil;
+        free(naluData);
+        naluData = nil;
+    }
+    else
+    {
+        if (nalu_type == 0x01) {
+#ifdef DEBUG
+                NSLog(@"nalu_type:%d is B/P frame",nalu_type);//其他帧
+#endif
+        }
+        uint32_t nalSize = (uint32_t)(frameSize - 4);
+        uint8_t *pNalSize = (uint8_t*)(&nalSize);
+        //转换字节序
+        frame[0] = *(pNalSize + 3);
+        frame[1] = *(pNalSize + 2);
+        frame[2] = *(pNalSize + 1);
+        frame[3] = *(pNalSize);
+        //解析数据
+        read_nal_unit(_h, buffer, frameSize - 4);
+        
+        if([self initH264Decoder])
+        {
+            pixelBuffer = [self decode:frame BufferSize:frameSize];
+            frameCount++;
+        }
+        _lastFrameNum =(int) _h->sh->frame_num;
+    }
+    
+    //截图保存图片
+    if (pixelBuffer) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            NotiPixelBufferValue *dataPtr = [NotiPixelBufferValue valueWithCVPixelBuffer:pixelBuffer];
+            NSDictionary *dict = [[NSDictionary alloc] initWithObjectsAndKeys:dataPtr,@"dataPtr",nil];
+            [[NSNotificationCenter defaultCenter] postNotificationName:@"GETPIXELBUFFER" object:dict userInfo:nil];
+        });
+        
+    }
+    else{
+#ifdef DEBUG
+        NSLog(@"VideoDecoder:PixelBuffer解码数据无效或失败");
+#endif
+    }
+}
+
 -(void)decodeNalu:(uint8_t *)frame withSize:(uint32_t)frameSize withoutStartCode:(uint8_t *)buffer
 {
     //    NSLog(@">>>>>>>>>>开始解码");
@@ -273,8 +408,9 @@ static int _lastFrameNum = -2;//上一帧帧序号
     switch (nalu_type)
     {
         case 0x05:
-        
-//                       NSLog(@"nalu_type:%d Nal type is IDR frame",nalu_type);  //关键帧
+#ifdef DEBUG
+            NSLog(@"nalu_type:%d Nal type is IDR frame",nalu_type);  //关键帧
+#endif
             _lastFrameNum = _h->sh->frame_num;
 
             if([self initH264Decoder])
@@ -293,28 +429,40 @@ static int _lastFrameNum = -2;//上一帧帧序号
             break;
         case 0x07:
         {
-//                       NSLog(@"nalu_type:%d Nal type is SPS",nalu_type);   //sps
+#ifdef DEBUG
+            NSLog(@"nalu_type:%d Nal type is SPS",nalu_type);   //sps
+#endif
             //保存分辨率
             if(((_h->sps->pic_height_in_map_units_minus1+1)*16) == k720){//720分辨率
                 [[NSUserDefaults standardUserDefaults] setObject:@(0) forKey:@"720P"];
             }else if (((_h->sps->pic_height_in_map_units_minus1+1)*16) == k480){//480分辨率
                 [[NSUserDefaults standardUserDefaults] setObject:@(1) forKey:@"720P"];
             }
+            else{
+                int value = ((_h->sps->pic_height_in_map_units_minus1+1)*16);
+                NSLog(@"nalu_type分辨率 : %d",value);
+            }
             _spsSize = frameSize - 4;
             _sps = (uint8_t *) malloc(_spsSize);
             memcpy(_sps, &frame[4], _spsSize);
+#ifdef DEBUG
             NSData * sps = [[NSData alloc] initWithBytes:frame length:_spsSize];
-            NSLog(@"sps---%@---%d",sps,_spsSize);
+            NSLog(@"sps---%@---%ld",sps,(long)_spsSize);
+#endif
             break;
         }
         case 0x08:
         {
-//                        NSLog(@"nalu_type:%d Nal type is PPS",nalu_type);   //pps
+#ifdef DEBUG
+            NSLog(@"nalu_type:%d Nal type is PPS",nalu_type);   //pps
+#endif
             _ppsSize = frameSize - 4;
             _pps = (uint8_t *) malloc(_ppsSize);
             memcpy(_pps, &frame[4], _ppsSize);
+#ifdef DEBUG
             NSData * pps = [[NSData alloc] initWithBytes:frame length:_ppsSize];
-            NSLog(@"pps---%@---%d",pps,_ppsSize);
+            NSLog(@"pps---%@---%ld",pps,(long)_ppsSize);
+#endif
             break;
         }
         default:
@@ -326,26 +474,28 @@ static int _lastFrameNum = -2;//上一帧帧序号
                 }
             }
             else{
-                //NSLog(@"Nal type is B/P frame");//其他帧
-                if(_isFrame_continuity){
-                                if(_h->sh->frame_num == _lastFrameNum+1)
-                                {
+#ifdef DEBUG
+                NSLog(@"nalu_type:%d is B/P frame",nalu_type);//其他帧
+#endif
+//                if(_isFrame_continuity){
+//                                if(_h->sh->frame_num == _lastFrameNum+1)
+//                                {
                                     if([self initH264Decoder])
                                     {
                                         pixelBuffer = [self decode:frame BufferSize:frameSize];
                                         frameCount++;
                                     }
                                     _lastFrameNum =(int) _h->sh->frame_num;
-                                    //NSLog(@"上一帧：%d",_lastFrameNum);
-                                    if(_lastFrameNum == frame_num_max -1){
-                                        _lastFrameNum = -1;
-                                    }
-                                }else
-                                {
-                                    _isFrame_continuity = NO;
-                                    NSLog(@"丢失的一帧：%d",_lastFrameNum);
-                                }
-                            }
+                                    NSLog(@"nalu_type上一帧：%d",_lastFrameNum);
+//                                    if(_lastFrameNum == frame_num_max -1){
+//                                        _lastFrameNum = -1;
+//                                    }
+//                                }else
+//                                {
+////                                    _isFrame_continuity = NO;
+//                                    NSLog(@"nalu_type丢失的一帧：%d",_lastFrameNum);
+//                                }
+//                            }
             }
 
             
