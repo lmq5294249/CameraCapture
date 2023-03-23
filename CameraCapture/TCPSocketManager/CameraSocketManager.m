@@ -25,6 +25,7 @@
 #define readSetVideoDirectionTag 215
 #define readStartPlaySDCardVideoTag 216
 #define readStopPlaySDCardVideoTag 217
+#define readGetSDCardThumbListTag 218
 
 #import "CameraSocketManager.h"
 #import <Photos/Photos.h>
@@ -43,7 +44,7 @@ const static NSString *GetPhotoEnd = @"end";
     
     NSMutableData *videoData;
     BOOL isDownVideoComplete;
-
+    BOOL isVideoThumbType;
 }
 
 @property (nonatomic, strong) NSString *filePath;
@@ -139,6 +140,20 @@ const static NSString *GetPhotoEnd = @"end";
 - (void)sendStopPlaySDCardVideoCmd
 {
     NSData *data = [DataUtil buildStopSDCardVideoPlayBackCmdPack];
+    [self.client writeData:data withTimeout:-1 tag:writeCmdTag];
+}
+
+- (void)sendGetSDCardPhotoThumbListCmd:(NSArray *)array
+{
+    isVideoThumbType = NO;
+    NSData *data = [DataUtil buildGetSDCardPhotoThumbListCmdPack:array];
+    [self.client writeData:data withTimeout:-1 tag:writeCmdTag];
+}
+
+- (void)sendGetSDCardVideoThumbListCmd:(NSArray *)array
+{
+    isVideoThumbType = YES;
+    NSData *data = [DataUtil buildGetSDCardVideoThumbListCmdPack:array];
     [self.client writeData:data withTimeout:-1 tag:writeCmdTag];
 }
 
@@ -277,6 +292,10 @@ const static NSString *GetPhotoEnd = @"end";
         else if (recHeadData.u32Type == 0x2034)
         {
             [self.client readDataToLength:restSize withTimeout:-1 tag:readStartPlaySDCardVideoTag];
+        }
+        else if (recHeadData.u32Type == 0x2011)
+        {
+            [self.client readDataToLength:restSize withTimeout:-1 tag:readGetSDCardThumbListTag];
         }
         else{
             [self.client readDataToLength:restSize withTimeout:-1 tag:0]; //读取指定的字节数
@@ -470,6 +489,18 @@ const static NSString *GetPhotoEnd = @"end";
             [self.delegate startVideoPlayback];
         }
     }
+    else if (tag == readGetSDCardThumbListTag)
+    {
+        //获取当前图片视频的缩略图
+        NSDictionary *cmdDic = [NSJSONSerialization JSONObjectWithData:recData options:NSJSONReadingMutableContainers error:nil];
+        if ([[cmdDic objectForKey:@"cmd"] isEqual:@"getSdThumListRsp"]) {
+            
+            NSArray *thumbArray = [cmdDic objectForKey:@"thumLists"];
+            NSArray *array = [self parseThunmbData:thumbArray videoThumbType:isVideoThumbType];
+            NSLog(@"缩略图:%lu",(unsigned long)array.count);
+            [self.delegate didGetThumbList:array];
+        }
+    }
     else
     {
         NSDictionary *cmdDic = [NSJSONSerialization JSONObjectWithData:recData options:NSJSONReadingMutableContainers error:nil];
@@ -559,6 +590,40 @@ const static NSString *GetPhotoEnd = @"end";
         NSLog(@"*******数据拼接次数count ：%d********",count);
     }
 
+}
+
+#pragma mark - 缩略图解析
+- (NSArray *)parseThunmbData:(NSArray *)array videoThumbType:(BOOL)isVideoType
+{
+    NSMutableArray *thumbArray = [NSMutableArray array];
+    int listNum = array.count;
+    for (int i = 0; i < listNum; i++) {
+        NSDictionary *dic = (NSDictionary *)array[i];
+        NSMutableDictionary *thumbDic = [[NSMutableDictionary alloc] init];
+        NSString *fileByName = [[[dic objectForKey:@"thumName"] lastPathComponent] stringByDeletingPathExtension];
+        NSString *thumbName;
+        //MARK:这里存在是否要加后缀来区分争议
+        if (isVideoType) {
+            thumbName = [NSString stringWithFormat:@"%@.mp4",fileByName];
+        }
+        else{
+            thumbName = [NSString stringWithFormat:@"%@.jpg",fileByName];
+        }
+        NSString *thumbDataStr = [dic objectForKey:@"thumData"];
+        NSData *data = [self base64Decode:thumbDataStr];
+        UIImage *image = [UIImage imageWithData:data];
+        //出现数据无法转成图像报错
+        if (image) {
+            [thumbDic setObject:thumbName forKey:@"thumName"];
+            [thumbDic setObject:image forKey:@"image"];
+            [thumbArray addObject:thumbDic];
+        }
+        else{
+            NSLog(@"报错打印：获取缩略图失败!!!!!!!!!!");
+        }
+        
+    }
+    return thumbArray;
 }
 
 
