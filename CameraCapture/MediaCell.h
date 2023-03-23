@@ -18,7 +18,7 @@ typedef void(^DidButtonClickBlock)(MediaModel *model, MediaButtonType buttonType
 
 @interface MediaCell : UITableViewCell
 
-
+@property (nonatomic, strong) UIImageView *thumbView;
 @property (nonatomic, strong) UILabel *fileNameLabel;
 @property (nonatomic, strong) UIButton *loadBtn;
 @property (nonatomic, strong) UIButton *deleteBtn;
