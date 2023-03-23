@@ -18,6 +18,7 @@ static NSString *btCellIdentifier = @"bluetoothCellIdentifier";
 @property (nonatomic, strong) UILabel *mediaLabel;
 @property (nonatomic, strong) UITableView *tableView;
 @property (nonatomic, assign) CGFloat cellHeight;
+@property (nonatomic, strong) NSMutableArray *requestArray; //申请缩略图数组
 
 @end
 
@@ -28,6 +29,7 @@ static NSString *btCellIdentifier = @"bluetoothCellIdentifier";
 {
     if (self = [super initWithFrame:frame]) {
         [self setupUI];
+        self.thumbDict = [[NSMutableDictionary alloc] init];
     }
     return self;
 }
@@ -63,7 +65,7 @@ static NSString *btCellIdentifier = @"bluetoothCellIdentifier";
     h = CGRectGetHeight(self.frame) - Tation_AutoFitWithX(44);
     x = 0;
     y = Tation_AutoFitWithX(54);
-    self.cellHeight = 60;
+    self.cellHeight = 120;
     self.tableView.frame = CGRectMake(x, y, w, h);
     [self addSubview:self.tableView];
 }
@@ -76,6 +78,11 @@ static NSString *btCellIdentifier = @"bluetoothCellIdentifier";
 - (void)setDataArray:(NSMutableArray *)dataArray
 {
     _dataArray = dataArray;
+    [self.tableView reloadData];
+}
+
+- (void)reloadData
+{
     [self.tableView reloadData];
 }
 
@@ -127,6 +134,18 @@ static NSString *btCellIdentifier = @"bluetoothCellIdentifier";
             });
         }
     };
+    
+    if (self.thumbDict) {
+        UIImage *image = [self.thumbDict objectForKey:model.fileName];
+        if (image) {
+            [cell.thumbView setImage:image];
+        }
+        else{
+            //加入申请数组中
+            [self.requestArray addObject:model];
+        }
+    }
+    
     return cell;
 }
 
@@ -139,6 +158,30 @@ static NSString *btCellIdentifier = @"bluetoothCellIdentifier";
 
 - (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
     return self.cellHeight;
+}
+
+#pragma mark - Scrollview
+//刷新缩略图
+- (void)scrollViewDidEndDecelerating:(UIScrollView *)scrollView
+{
+    NSLog(@"------tableview停止滚动------");
+    if (self.requestArray.count > 0 && self.delegate) {
+        [self.delegate didRequestMediaThumbWith:self.requestArray meidaType:_curMediaType];
+    }
+}
+
+- (void)scrollViewDidEndDragging:(UIScrollView *)scrollView willDecelerate:(BOOL)decelerate {
+    if (!decelerate) {
+        // 停止类型3
+        BOOL dragToDragStop = scrollView.tracking && !scrollView.dragging && !scrollView.decelerating;
+        if (dragToDragStop) {
+            
+            NSLog(@"------tableview停止滚动------");
+            if (self.requestArray && self.delegate) {
+                [self.delegate didRequestMediaThumbWith:self.requestArray meidaType:_curMediaType];
+            }
+        }
+    }
 }
 
 #pragma mark - 懒加载
@@ -188,5 +231,12 @@ static NSString *btCellIdentifier = @"bluetoothCellIdentifier";
     return _tableView;
 }
 
+- (NSMutableArray *)requestArray
+{
+    if (!_requestArray) {
+        _requestArray = [NSMutableArray array];
+    }
+    return _requestArray;
+}
 
 @end
