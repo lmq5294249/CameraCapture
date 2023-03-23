@@ -20,6 +20,8 @@
 
 - (void)didFinishFormatSDCard;
 
+- (void)didGetThumbList:(NSArray *)array;
+
 @end
 
 
