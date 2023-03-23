@@ -79,7 +79,7 @@
     
     //修改播放器的播放地址
     //self.mediaDecoder.rtspString = @"rtsp://wowzaec2demo.streamlock.net/vod/mp4:BigBuckBunny_115k.mp4";
-    self.mediaDecoder.rtspString = @"rtsp://192.168.2.1/live3";
+    //self.mediaDecoder.rtspString = @"rtsp://192.168.2.1/live3";
     //默认开始时没有开启接收视频流
     self.mediaDecoder.isOpenTheVideoStream = NO;
     
