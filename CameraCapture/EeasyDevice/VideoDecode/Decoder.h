@@ -45,4 +45,6 @@ typedef void (^CollectImageComplete)(NSArray<UIImage *> *arrImg);
 - (void)startShareAndCollectImageDataWithBlock:(CollectImageComplete)block;
 - (void)closeShare;
 - (UIImage *)getImg:(CVPixelBufferRef)pixelBuf;
+
+- (void)parseAndDecodeH264Nalu:(uint8_t *)frame withSize:(uint32_t)frameSize withoutStartCode:(uint8_t *)buffer;
 @end
