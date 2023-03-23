@@ -32,6 +32,8 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)sendStopPlaySDCardVideoCmd;
 - (void)sendSetupCameraSystemTimeCmd;
 - (void)sendGetCameraSystemTimeCmd;
+- (void)sendGetSDCardPhotoThumbListCmd:(NSArray *)array;
+- (void)sendGetSDCardVideoThumbListCmd:(NSArray *)array;
 //格式化SD卡请求
 - (void)sendFormatSDCardCmd;
 //设置相机wifi名字和密码
